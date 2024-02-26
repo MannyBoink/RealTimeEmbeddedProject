@@ -64,7 +64,7 @@ enum hrtimer_restart hrtimer_handler(struct hrtimer *timer) {
     struct list_rtmon_param *ltp = container_of(timer, struct list_rtmon_param, hr_timer);
     ktime_t k_time = ms_to_ktime(ltp->info.T);
 
-    // check if the task still exists in the list
+    // check if the task still exists
     found_task = pid_task(find_vpid(ltp->info.pid), PIDTYPE_PID);
 
     if (found_task != 0) { // task has been found active - reset the timer
@@ -72,7 +72,7 @@ enum hrtimer_restart hrtimer_handler(struct hrtimer *timer) {
         wake_up_process(found_task);
         return HRTIMER_RESTART;
     }
-    else { //task is inactive - do not reset the timer
+    else { //task is inactive - do not reset the timer (would i ever need to worry about a race condition)
         list_del(&ltp->l);
         vfree(ltp);
         return HRTIMER_NORESTART; 
@@ -94,9 +94,7 @@ long rtmon_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
     struct rtmon_param new_task;
     int del_pid; 
 
-    if (arg == 0) { //user passed in null
-        return -1;
-    }
+    // error checking arg?
 
     switch(cmd) {
         case SET_RTMON:
@@ -106,9 +104,7 @@ long rtmon_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
             return lkm_set_rtmon(&new_task);
             break;
         case CANCEL_RTMON:
-            if (copy_from_user(&del_pid, (int*)arg, sizeof(int)) != 0) {
-                return -1; // error
-            }
+            del_pid = (int)arg;
             return lkm_cancel_rtmon(del_pid);
             break;
         case WAIT_FOR_NEXT_PERIOD:
@@ -137,7 +133,7 @@ long lkm_set_rtmon(struct rtmon_param *new_task) {
         return -1; 
     }
 
-    // new_task has valid parameters, is it already in the list?
+    // new_task has valid parameters and is currently running, is it already in the list?
     list_for_each_entry(p, &rt_task_list, l) {
         if (p->info.pid == new_task->pid) { // task has been found in the list
             return -1;
@@ -189,7 +185,7 @@ ssize_t rtmon_read(struct file *flip, char __user *buf, size_t count, loff_t *f_
         if (found_task != 0) { // task has been found active - print it
             printk("print_rtmon: PID %d, C %d ms, T %d ms\n", p->info.pid, p->info.C, p->info.T);
         }
-        else if (found_task == 0) { //task is in the list but inactive - delete it (add hrtimer_cancel here?)
+        else if (found_task == 0) { //task is in the list but inactive - delete it
             hrtimer_cancel(&(p->hr_timer));
             list_del(&p->l);
             vfree(p);
