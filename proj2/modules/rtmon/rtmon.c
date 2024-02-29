@@ -26,7 +26,7 @@
 
 int rtmon_init(void);
 long rtmon_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
-ssize_t rtmon_read(struct file *flip, char __user *buf, size_t count, loff_t *f_pos);
+ssize_t lkm_print_rtmon(struct file *flip, char __user *buf, size_t count, loff_t *f_pos);
 void rtmon_exit(void);
 
 struct rtmon_param {
@@ -45,7 +45,7 @@ LIST_HEAD(rt_task_list);
 
 struct file_operations fops = {
     .owner = THIS_MODULE, 
-    .read = rtmon_read,
+    .read = lkm_print_rtmon,
     .unlocked_ioctl = rtmon_ioctl,
 };
 
@@ -174,8 +174,9 @@ long lkm_cancel_rtmon(int del_pid) {
     return -1;
 }
 
-// print all tasks in the list, if a task in the list isnt found - then 
-ssize_t rtmon_read(struct file *flip, char __user *buf, size_t count, loff_t *f_pos) {
+// print all tasks in the list, if a task in the list isnt found - then remove the 
+// task from the list
+ssize_t lkm_print_rtmon(struct file *flip, char __user *buf, size_t count, loff_t *f_pos) {
     struct list_rtmon_param *p, *tmp;
     struct task_struct *found_task;
 
