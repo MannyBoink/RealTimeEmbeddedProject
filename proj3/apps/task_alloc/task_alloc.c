@@ -17,7 +17,7 @@ struct bin {
 
     int task_list_count;
     int task_list_size; 
-    struct task *task_list; //i could cheat and make it an array of strings
+    struct task *task_list;
 };
 
 int compare(const void *x, const void *y); 
@@ -25,9 +25,11 @@ int compare(const void *x, const void *y);
 void bin_task_list_del(struct bin bins[], int num_of_bins);
 void bin_task_list_add(struct bin *list, struct task new_task); 
 
-void BFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks);
-void WFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks);
-void FFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks);
+int BFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks);
+int WFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks);
+int FFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks);
+
+void print_result(struct bin *CPU, int num_of_bins);
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -45,7 +47,8 @@ int main(int argc, char *argv[]) {
 
     struct task my_task; 
 
-    int counter = 0;
+    int num_of_tasks_check = 0;
+    int pass = 0;
 
     // check if file exists
     if (fp == 0) {
@@ -64,31 +67,38 @@ int main(int argc, char *argv[]) {
     info = strtok(buffer, ","); // get number of tasks
     num_of_tasks = atoi(info);
 
-    printf("file has %d bins, %s policy, and %d tasks\n", num_of_bins, policy, num_of_tasks);
-
-    // set up data structure size
-    struct task tasks[num_of_tasks];
-    struct bin CPU[num_of_bins];
-
-    // initialize tasks array to input tasks
-    while (fgets(buffer, BUFFER_SIZE, fp) != 0 && counter < num_of_tasks) {
-        info = strtok(buffer, ",");
-        strcpy(tasks[counter].name, info);
-        info = strtok(0, ",");
-        tasks[counter].C = atoi(info);
-        info = strtok(0, ",");
-        tasks[counter].T = atoi(info);
-
-        tasks[counter].util = (float)tasks[counter].C / (float)tasks[counter].T;
-
-        counter++;
+    // make sure parameters are valid
+    if (num_of_bins <= 0 || num_of_tasks <= 0) {
+        return -1;
     }
 
-    // initialize CPUs (need to also allocate memory at this point but thats a todo)
+    // set up data structures 
+    struct task *tasks = malloc(sizeof(struct task) * num_of_tasks);
+    struct bin *CPU = malloc(sizeof(struct bin) * num_of_bins);
+
+    // initialize tasks array to input tasks
+    while (fgets(buffer, BUFFER_SIZE, fp) != 0 && num_of_tasks_check < num_of_tasks) {
+        info = strtok(buffer, ",");
+        strcpy(tasks[num_of_tasks_check].name, info);
+        info = strtok(0, ",");
+        tasks[num_of_tasks_check].C = atoi(info);
+        info = strtok(0, ",");
+        tasks[num_of_tasks_check].T = atoi(info);
+
+        tasks[num_of_tasks_check].util = (float)tasks[num_of_tasks_check].C / (float)tasks[num_of_tasks_check].T;
+
+        num_of_tasks_check++;
+    }
+
+    if (num_of_tasks > num_of_tasks_check) { // user input more tasks than listed in file
+        num_of_tasks = num_of_tasks_check;
+    }
+
+    // initialize CPUs 
     for (int i = 0; i < num_of_bins; i++) {
         CPU[i].capacity = 0;            // empty bin (0 = empty, 1 = full)
 
-        CPU[i].task_count = 0;          // current CPU task count
+        CPU[i].task_list_count = 0;     // current CPU task count
         CPU[i].task_list_size = 10;     // initial list size
         CPU[i].task_list = (struct task*)malloc(CPU[i].task_list_size * sizeof(struct task));
     }
@@ -98,25 +108,25 @@ int main(int argc, char *argv[]) {
 
     // at this point we're ready to run the algorithm
     if (strcmp(policy, "BFD") == 0) {
-        BFD_heuristic(CPU, tasks, num_of_bins, num_of_tasks);
+        pass = BFD_heuristic(CPU, tasks, num_of_bins, num_of_tasks);
     }
     else if (strcmp(policy, "WFD") == 0) {
-        WFD_heuristic(CPU, tasks, num_of_bins, num_of_tasks);
+        pass = WFD_heuristic(CPU, tasks, num_of_bins, num_of_tasks);
     }
     else if (strcmp(policy, "FFD") == 0) {
-        FFD_heuristic(CPU, tasks, num_of_bins, num_of_tasks);
+        pass = FFD_heuristic(CPU, tasks, num_of_bins, num_of_tasks);
     }
 
-    // array iteration is done backwards to match example output, but does it really matter?
-    for (int i = 0; i < num_of_bins; i++) {
-        printf("CPU[%d]", i);
-        for (int j = CPU[i].task_count - 1; j >= 0; j--) {
-            printf(",%s", CPU[i].task_list[j].name);
-        }
-        printf("\n");
+    // array iteration is done backwards to match example output
+    if (pass == 0) {
+        print_result(CPU, num_of_bins);
     }
 
+    // dynamic mem cleanup
     bin_task_list_del(CPU, num_of_bins);
+    free(tasks);
+    free(CPU);
+    
     fclose(fp);
 
     return 0;
@@ -128,20 +138,20 @@ void bin_task_list_del(struct bin bins[], int num_of_bins) {
         free(bins[i].task_list);
         bins[i].task_list = 0;
         bins[i].task_list_size = 0;
-        bins[i].task_count = 0;
+        bins[i].task_list_count = 0;
     }
 }
 
 // adds element to the end of an array
 void bin_task_list_add(struct bin *list, struct task new_task) {
-    if (list->task_count == list->task_list_size) {
+    if (list->task_list_count == list->task_list_size) {
         list->task_list_size *= 2;
         list->task_list = realloc(list->task_list, list->task_list_size * sizeof(struct task));
     }
-    list->task_list[list->task_count++] = new_task;
+    list->task_list[list->task_list_count++] = new_task;
 }
 
-void BFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks) {
+int WFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks) {
     struct bin *chosen_bin; // pointer to chosen bin (CPU)
 
     float test_capacity; 
@@ -157,7 +167,7 @@ void BFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int nu
                 min_capacity = CPUs[j].capacity + tasks[i].util;
             }
         }
-        // outside chosen_bin should point to chosen bin, check capacity, if over 1, then end the algorithm
+
         if (chosen_bin != 0) { // found a "optimal" bin to fit task into
             chosen_bin->capacity += tasks[i].util;
             bin_task_list_add(chosen_bin, tasks[i]);
@@ -165,14 +175,14 @@ void BFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int nu
         }
         else {
             printf("Failure\n");
-            return;
+            return -1;
         }
     }
     printf("Success\n");
-    return;
+    return 0;
 }
 
-void WFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks) {
+int BFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks) {
     struct bin *chosen_bin; // pointer to chosen bin (CPU)
 
     float test_capacity; 
@@ -188,7 +198,7 @@ void WFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int nu
                 max_capacity = CPUs[j].capacity + tasks[i].util;
             }
         }
-        // outside chosen_bin should point to chosen bin, check capacity, if over 1, then end the algorithm
+    
         if (chosen_bin != 0) { // found a "optimal" bin to fit task into
             chosen_bin->capacity += tasks[i].util;
             bin_task_list_add(chosen_bin, tasks[i]);
@@ -196,14 +206,14 @@ void WFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int nu
         }
         else {
             printf("Failure\n");
-            return;
+            return -1;
         }
     }
     printf("Success\n");
-    return;
+    return 0;
 }
 
-void FFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks) {
+int FFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int num_of_tasks) {
     struct bin *chosen_bin; // pointer to chosen bin (CPU)
     float test_capacity;
 
@@ -216,7 +226,7 @@ void FFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int nu
                 break;
             }
         }
-        // outside chosen_bin should point to chosen bin, check capacity, if over 1, then end the algorithm
+
         if (chosen_bin != 0) { // found a "optimal" bin to fit task into
             chosen_bin->capacity += tasks[i].util;
             bin_task_list_add(chosen_bin, tasks[i]);
@@ -224,10 +234,22 @@ void FFD_heuristic(struct bin *CPUs, struct task *tasks, int num_of_bins, int nu
         }
         else {
             printf("Failure\n");
-            return;
+            return -1;
         }
     }
     printf("Success\n");
+    return 0;
+}
+
+void print_result(struct bin *CPU, int num_of_bins) {
+    for (int i = 0; i < num_of_bins; i++) {
+        printf("CPU%d", i);
+        for (int j = CPU[i].task_list_count - 1; j >= 0; j--) {
+            printf(",%s", CPU[i].task_list[j].name);
+        }
+        printf("\n");
+    }
+
     return;
 }
 

@@ -43,7 +43,7 @@ int vm_areas_init(void) {
 }
 
 ssize_t vm_areas_write(struct file *filp, const char __user *ubuf, size_t count, loff_t *f_pos) {
-    char kbuf[BUFFER_SIZE]; 
+    char kbuf[BUFFER_SIZE] = {'\0'}; 
     struct task_struct *input_task_tcb;
 
     int input_task_pid; 

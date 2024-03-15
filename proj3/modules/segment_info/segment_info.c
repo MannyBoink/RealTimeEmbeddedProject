@@ -52,7 +52,7 @@ int segment_info_init(void) {
 * change the error messages eventually 
 */
 ssize_t segment_info_write(struct file *filp, const char __user *ubuf, size_t count, loff_t *f_pos) {
-    char kbuf[BUFFER_SIZE]; 
+    char kbuf[BUFFER_SIZE] = {'\0'};
     struct task_struct *input_task_tcb;
 
     int input_task_pid; 
@@ -73,6 +73,7 @@ ssize_t segment_info_write(struct file *filp, const char __user *ubuf, size_t co
 
     clean_kbuf = strstrip(kbuf);
     
+    // why is kstrtoint failing when input exceeds 11 chars (11111111111)
     if (kstrtoint(clean_kbuf, 0, &input_task_pid)) {
         printk("segment_info: error - kstrtoint()\n");
         return -1;

@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
 
     printf("PID %d, %lld ns\n", getpid(), total_time_ns);
 
-    free(buf);
     pause();
+    free(buf);
 
     return 0;
 }
