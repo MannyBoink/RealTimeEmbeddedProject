@@ -107,11 +107,11 @@ ssize_t vm_areas_write(struct file *filp, const char __user *ubuf, size_t count,
         size_phys_mem_pages = num_phys_mem_pages * PAGE_SIZE_KB;
 
         if (vma->vm_flags & VM_LOCKED) { 
-            printk("%08lx -  %08lx: %lu bytes [L], %d pages (%d KB) in phymem\n", 
+            printk("%08lx - %08lx: %lu bytes [L], %d pages (%d KB) in phymem\n", 
                 vma->vm_start, vma->vm_end, vma_size, num_phys_mem_pages, size_phys_mem_pages);
         }
         else {
-           printk("%08lx -  %08lx: %lu bytes, %d pages (%d KB) in phymem\n", 
+           printk("%08lx - %08lx: %lu bytes, %d pages (%d KB) in phymem\n", 
                 vma->vm_start, vma->vm_end, vma_size, num_phys_mem_pages, size_phys_mem_pages);
         }
 
